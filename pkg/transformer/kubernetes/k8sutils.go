@@ -405,7 +405,7 @@ func (k *Kubernetes) UpdateKubernetesObjects(name string, service kobject.Servic
 			if service.Pid == "host" {
 				podSecurityContext.HostPID = true
 			} else {
-				log.Warningf("Ignoring pid key for service \"%v\". Invalid value \"%v\".", name, service.Pid)
+				log.Warningf("Ignoring PID key for service \"%v\". Invalid value \"%v\".", name, service.Pid)
 			}
 		}
 
