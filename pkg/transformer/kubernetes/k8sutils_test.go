@@ -398,3 +398,24 @@ func TestDurationStrToSecondsInt(t *testing.T) {
 		}
 	}
 }
+
+//Test get supplementalgroup in k8s from group_add in compose file
+func TestGetSupplementalGroup(t *testing.T) {
+	testCases := map[string]struct {
+		in  []string
+		out []int64
+	}{
+		"null":      {in: nil, out: nil},
+		"allnumber": {in: []string{"1", "234"}, out: []int64{1, 234}},
+		"mix":       {in: []string{"1", "abc"}, out: nil},
+		"empty":     {in: []string{}, out: nil},
+	}
+
+	for name, test := range testCases {
+		result, _ := GetSupplementalGroup(test.in)
+		if !reflect.DeepEqual(test.out, result) {
+			t.Errorf("Case '%v' for TestGetSupplementalGroup fail, Expected '%v' , got '%v'", name, test.out, result)
+			t.Logf("type:%v,type:%v", reflect.TypeOf(test.out), reflect.TypeOf(result))
+		}
+	}
+}

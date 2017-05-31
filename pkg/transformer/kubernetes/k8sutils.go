@@ -43,7 +43,6 @@ import (
 
 	deployapi "github.com/openshift/origin/pkg/deploy/api"
 	"github.com/pkg/errors"
-	"k8s.io/kubernetes/pkg/api/resource"
 )
 
 /**
@@ -391,13 +390,8 @@ func (k *Kubernetes) UpdateKubernetesObjects(name string, service kobject.Servic
 			}
 		}
 
-		// Configure the resource limits
-		if service.MemLimit != 0 {
-			memoryResourceList := api.ResourceList{
-				api.ResourceMemory: *resource.NewQuantity(
-					int64(service.MemLimit), "RandomStringForFormat")}
-			template.Spec.Containers[0].Resources.Limits = memoryResourceList
-		}
+		// Configure the resource requirements
+		template.Spec.Containers[0].Resources = k.ConfigResourceRequirements(name, service)
 
 		podSecurityContext := &api.PodSecurityContext{}
 		//set pid namespace mode
@@ -406,6 +400,13 @@ func (k *Kubernetes) UpdateKubernetesObjects(name string, service kobject.Servic
 				podSecurityContext.HostPID = true
 			} else {
 				log.Warningf("Ignoring PID key for service \"%v\". Invalid value \"%v\".", name, service.Pid)
+			}
+		}
+
+		if service.GroupAdd != nil {
+			podSecurityContext.SupplementalGroups, err = GetSupplementalGroup(service.GroupAdd)
+			if err != nil {
+				log.Warningf("Failed to convert \"group_add\" to \"SupplementalGroups\" for service \"%v\", you may need to change group name to GId because Kubernetes supplementalGroups supports only GIds.", name)
 			}
 		}
 
@@ -586,4 +587,19 @@ func DurationStrToSecondsInt(s string) (*int64, error) {
 	}
 	r := (int64)(duration.Seconds())
 	return &r, nil
+}
+
+//Get supplementalGroup from group_add
+//Convert gid to int, if cannot convert to integer, return error
+func GetSupplementalGroup(gs []string) ([]int64, error) {
+
+	var gids []int64
+	for _, g := range gs {
+		gid, err := strconv.ParseInt(g, 10, 64)
+		if err != nil {
+			return nil, err
+		}
+		gids = append(gids, gid)
+	}
+	return gids, nil
 }

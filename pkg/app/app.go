@@ -197,14 +197,15 @@ func validateControllers(opt *kobject.ConvertOptions) {
 }
 
 // Convert transforms docker compose or dab file to k8s objects
-func Convert(opt kobject.ConvertOptions) {
+func Convert(opt kobject.ConvertOptions) error {
 
 	validateControllers(&opt)
 
 	// loader parses input from file into komposeObject.
 	l, err := loader.GetLoader(inputFormat)
 	if err != nil {
-		log.Fatal(err)
+		log.Error(err)
+		return err
 	}
 
 	komposeObject := kobject.KomposeObject{
@@ -212,7 +213,8 @@ func Convert(opt kobject.ConvertOptions) {
 	}
 	komposeObject, err = l.LoadFile(opt.InputFiles)
 	if err != nil {
-		log.Fatalf(err.Error())
+		log.Errorf(err.Error())
+		return err
 	}
 
 	// Get a transformer that maps komposeObject to provider's primitives
@@ -222,25 +224,29 @@ func Convert(opt kobject.ConvertOptions) {
 	objects, err := t.Transform(komposeObject, opt)
 
 	if err != nil {
-		log.Fatalf(err.Error())
+		log.Errorf(err.Error())
+		return err
 	}
 
 	// Print output
 	err = kubernetes.PrintList(objects, opt)
 	if err != nil {
-		log.Fatalf(err.Error())
+		log.Errorf(err.Error())
+		return err
 	}
+	return nil
 }
 
 // Up brings up deployment, svc.
-func Up(opt kobject.ConvertOptions) {
+func Up(opt kobject.ConvertOptions) error {
 
 	validateControllers(&opt)
 
 	// loader parses input from file into komposeObject.
 	l, err := loader.GetLoader(inputFormat)
 	if err != nil {
-		log.Fatal(err)
+		log.Error(err)
+		return err
 	}
 
 	komposeObject := kobject.KomposeObject{
@@ -248,7 +254,8 @@ func Up(opt kobject.ConvertOptions) {
 	}
 	komposeObject, err = l.LoadFile(opt.InputFiles)
 	if err != nil {
-		log.Fatalf(err.Error())
+		log.Errorf(err.Error())
+		return err
 	}
 
 	// Get the transformer
@@ -257,8 +264,10 @@ func Up(opt kobject.ConvertOptions) {
 	//Submit objects to provider
 	errDeploy := t.Deploy(komposeObject, opt)
 	if errDeploy != nil {
-		log.Fatalf("Error while deploying application: %s", errDeploy)
+		log.Errorf("Error while deploying application: %s", errDeploy)
+		return err
 	}
+	return nil
 }
 
 // Down deletes all deployment, svc.

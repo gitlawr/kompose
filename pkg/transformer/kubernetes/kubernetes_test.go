@@ -22,6 +22,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/docker/libcompose/yaml"
 	deployapi "github.com/openshift/origin/pkg/deploy/api"
 
 	"github.com/kubernetes-incubator/kompose/pkg/kobject"
@@ -29,6 +30,7 @@ import (
 
 	"github.com/pkg/errors"
 	"k8s.io/kubernetes/pkg/api"
+	"k8s.io/kubernetes/pkg/api/resource"
 	"k8s.io/kubernetes/pkg/apis/extensions"
 )
 
@@ -525,6 +527,34 @@ func TestConfigCapabilities(t *testing.T) {
 		result := k.ConfigCapabilities(test.service)
 		if !reflect.DeepEqual(result.Add, test.result.Add) || !reflect.DeepEqual(result.Drop, test.result.Drop) {
 			t.Errorf("Not expected result for ConfigCapabilities")
+		}
+	}
+}
+
+func TestConfigResourceRequirements(t *testing.T) {
+	testCases := map[string]struct {
+		service kobject.ServiceConfig
+		result  api.ResourceRequirements
+	}{
+		"CPUShares:512": {
+			service: kobject.ServiceConfig{CPUShares: 512},
+			result: api.ResourceRequirements{Requests: api.ResourceList{
+				api.ResourceCPU: *resource.NewMilliQuantity(500, resource.DecimalSI)}}},
+		"CPUQuota:50000": {service: kobject.ServiceConfig{CPUQuota: 50000},
+			result: api.ResourceRequirements{Limits: api.ResourceList{
+				api.ResourceCPU: *resource.NewMilliQuantity(500, resource.DecimalSI)}}},
+		"MemLimit:500": {service: kobject.ServiceConfig{MemLimit: yaml.MemStringorInt(500)},
+			result: api.ResourceRequirements{Limits: api.ResourceList{
+				api.ResourceMemory: *resource.NewQuantity(500, "RandomStringForFormat")}}},
+		"CPUShares:-1": {
+			service: kobject.ServiceConfig{CPUShares: -1},
+			result:  api.ResourceRequirements{}},
+	}
+	k := Kubernetes{}
+	for name, test := range testCases {
+		result := k.ConfigResourceRequirements("servicename", test.service)
+		if !reflect.DeepEqual(result, test.result) {
+			t.Errorf("Test case: %v. Expected  \"%v\" for ConfigResourceRequirements and got \"%v\"", name, result, test.result)
 		}
 	}
 }

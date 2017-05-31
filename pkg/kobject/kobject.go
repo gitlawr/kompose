@@ -91,6 +91,7 @@ type ServiceConfig struct {
 	MemLimit        yaml.MemStringorInt `compose:"mem_limit" bundle:""`
 	TmpFs           []string            `compose:"tmpfs" bundle:""`
 	Dockerfile      string              `compose:"dockerfile" bundle:""`
+	GroupAdd        []string            `compose:"group_add" bundle:""`
 }
 
 // EnvVar holds the environment variable struct of a container

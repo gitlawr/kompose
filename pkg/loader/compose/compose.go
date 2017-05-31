@@ -53,7 +53,6 @@ func checkUnsupportedKey(composeProject *project.Project) []string {
 	var unsupportedKey = map[string]bool{
 		"CgroupParent":  false,
 		"CPUSet":        false,
-		"CPUShares":     false,
 		"Devices":       false,
 		"DependsOn":     false,
 		"DNS":           false,
@@ -365,6 +364,7 @@ func (c *Compose) LoadFile(files []string) (kobject.KomposeObject, error) {
 		// convert compose labels to annotations
 		serviceConfig.Annotations = map[string]string(composeServiceConfig.Labels)
 		serviceConfig.CPUQuota = int64(composeServiceConfig.CPUQuota)
+		serviceConfig.CPUShares = int64(composeServiceConfig.CPUShares)
 		serviceConfig.CapAdd = composeServiceConfig.CapAdd
 		serviceConfig.CapDrop = composeServiceConfig.CapDrop
 		serviceConfig.Pid = composeServiceConfig.Pid
@@ -378,6 +378,7 @@ func (c *Compose) LoadFile(files []string) (kobject.KomposeObject, error) {
 		serviceConfig.MemLimit = composeServiceConfig.MemLimit
 		serviceConfig.TmpFs = composeServiceConfig.Tmpfs
 		serviceConfig.StopGracePeriod = composeServiceConfig.StopGracePeriod
+		serviceConfig.GroupAdd = composeServiceConfig.GroupAdd
 		komposeObject.ServiceConfigs[normalizeServiceNames(name)] = serviceConfig
 		if normalizeServiceNames(name) != name {
 			log.Infof("Service name in docker-compose has been changed from %q to %q", name, normalizeServiceNames(name))

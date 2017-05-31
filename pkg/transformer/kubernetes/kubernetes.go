@@ -450,6 +450,43 @@ func (k *Kubernetes) ConfigVolumes(name string, service kobject.ServiceConfig) (
 	return volumeMounts, volumes, PVCs, nil
 }
 
+//ConfigResourceRequirements is helper function to create resourcerequirements for containers
+func (k *Kubernetes) ConfigResourceRequirements(name string, service kobject.ServiceConfig) api.ResourceRequirements {
+	// Configure the resource limits
+	resourceRequirements := api.ResourceRequirements{}
+	resourceLimits := api.ResourceList{}
+	if service.MemLimit != 0 {
+		resourceLimits[api.ResourceMemory] = *resource.NewQuantity(int64(service.MemLimit), "RandomStringForFormat")
+	}
+	if service.CPUQuota != 0 {
+		if service.CPUQuota < 0 {
+			log.Warnf("Ignoring CPUQuota for service \"%v\", Invalid value: \"%v\": must be greater than or equal to 0", name, service.CPUQuota)
+		} else {
+			//CpuQuota = limitCpu * 100
+			resourceLimits[api.ResourceCPU] = *resource.NewMilliQuantity(service.CPUQuota/100, resource.DecimalSI)
+		}
+	}
+	if !reflect.DeepEqual(resourceLimits, api.ResourceList{}) {
+		resourceRequirements.Limits = resourceLimits
+	}
+
+	resourceRequests := api.ResourceList{}
+	if service.CPUShares != 0 {
+		if service.CPUShares < 0 {
+			log.Warnf("Ignoring CPUShares for service \"%v\", Invalid value: \"%v\": must be greater than or equal to 0", name, service.CPUShares)
+		} else {
+			//CpuShare = requestCpu * 1024
+			resourceRequests[api.ResourceCPU] = *resource.NewMilliQuantity(service.CPUShares*1000/1024, resource.DecimalSI)
+		}
+	}
+	if !reflect.DeepEqual(resourceRequests, api.ResourceList{}) {
+		resourceRequirements.Requests = resourceRequests
+	}
+
+	return resourceRequirements
+
+}
+
 // ConfigEmptyVolumeSource is helper function to create an EmptyDir api.VolumeSource
 //either for Tmpfs or for emptyvolumes
 func (k *Kubernetes) ConfigEmptyVolumeSource(key string) *api.VolumeSource {
