@@ -17,6 +17,7 @@ limitations under the License.
 package app
 
 import (
+	"bytes"
 	"strings"
 
 	log "github.com/Sirupsen/logrus"
@@ -197,7 +198,7 @@ func validateControllers(opt *kobject.ConvertOptions) {
 }
 
 // Convert transforms docker compose or dab file to k8s objects
-func Convert(opt kobject.ConvertOptions) error {
+func Convert(opt kobject.ConvertOptions) (string, error) {
 
 	validateControllers(&opt)
 
@@ -205,40 +206,41 @@ func Convert(opt kobject.ConvertOptions) error {
 	l, err := loader.GetLoader(inputFormat)
 	if err != nil {
 		log.Error(err)
-		return err
+		return "", err
 	}
 
 	komposeObject := kobject.KomposeObject{
-		ServiceConfigs: make(map[string]kobject.ServiceConfig),
+		ServiceConfigs:    make(map[string]kobject.ServiceConfig),
+		TransformMessages: bytes.Buffer{},
 	}
 	komposeObject, err = l.LoadFile(opt.InputFiles)
 	if err != nil {
 		log.Errorf(err.Error())
-		return err
+		return "", err
 	}
 
 	// Get a transformer that maps komposeObject to provider's primitives
 	t := getTransformer(opt)
 
 	// Do the transformation
-	objects, err := t.Transform(komposeObject, opt)
+	objects, err := t.Transform(&komposeObject, opt)
 
 	if err != nil {
 		log.Errorf(err.Error())
-		return err
+		return "", err
 	}
 
 	// Print output
 	err = kubernetes.PrintList(objects, opt)
 	if err != nil {
 		log.Errorf(err.Error())
-		return err
+		return "", err
 	}
-	return nil
+	return komposeObject.TransformMessages.String(), nil
 }
 
 // Up brings up deployment, svc.
-func Up(opt kobject.ConvertOptions) error {
+func Up(opt kobject.ConvertOptions) (string, error) {
 
 	validateControllers(&opt)
 
@@ -246,60 +248,66 @@ func Up(opt kobject.ConvertOptions) error {
 	l, err := loader.GetLoader(inputFormat)
 	if err != nil {
 		log.Error(err)
-		return err
+		return "", err
 	}
 
 	komposeObject := kobject.KomposeObject{
-		ServiceConfigs: make(map[string]kobject.ServiceConfig),
+		TransformMessages: bytes.Buffer{},
+		ServiceConfigs:    make(map[string]kobject.ServiceConfig),
 	}
 	komposeObject, err = l.LoadFile(opt.InputFiles)
 	if err != nil {
 		log.Errorf(err.Error())
-		return err
+		return "", err
 	}
 
 	// Get the transformer
 	t := getTransformer(opt)
 
 	//Submit objects to provider
-	errDeploy := t.Deploy(komposeObject, opt)
+	errDeploy := t.Deploy(&komposeObject, opt)
 	if errDeploy != nil {
 		log.Errorf("Error while deploying application: %s", errDeploy)
-		return err
+		return "", errDeploy
 	}
-	return nil
+	return komposeObject.TransformMessages.String(), nil
 }
 
 // Down deletes all deployment, svc.
-func Down(opt kobject.ConvertOptions) {
+func Down(opt kobject.ConvertOptions) (string, error) {
 
 	validateControllers(&opt)
 
 	// loader parses input from file into komposeObject.
 	l, err := loader.GetLoader(inputFormat)
 	if err != nil {
-		log.Fatal(err)
+		log.Error(err)
+		return "", err
 	}
 
 	komposeObject := kobject.KomposeObject{
-		ServiceConfigs: make(map[string]kobject.ServiceConfig),
+		TransformMessages: bytes.Buffer{},
+		ServiceConfigs:    make(map[string]kobject.ServiceConfig),
 	}
 	komposeObject, err = l.LoadFile(opt.InputFiles)
 	if err != nil {
-		log.Fatalf(err.Error())
+		log.Errorf(err.Error())
+		return "", err
 	}
 
 	// Get the transformer
 	t := getTransformer(opt)
 
 	//Remove deployed application
-	errUndeploy := t.Undeploy(komposeObject, opt)
+	errUndeploy := t.Undeploy(&komposeObject, opt)
 	if errUndeploy != nil {
 		for _, err = range errUndeploy {
-			log.Fatalf("Error while deleting application: %s", err)
+			log.Errorf("Error while deleting application: %s", err)
+			return "", err
 		}
 	}
 
+	return komposeObject.TransformMessages.String(), nil
 }
 
 // Convenience method to return the appropriate Transformer based on

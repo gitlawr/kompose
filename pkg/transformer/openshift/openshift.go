@@ -337,8 +337,8 @@ func (o *OpenShift) initRoute(name string, service kobject.ServiceConfig, port i
 
 // Transform maps komposeObject to openshift objects
 // returns objects that are already sorted in the way that Services are first
-func (o *OpenShift) Transform(komposeObject kobject.KomposeObject, opt kobject.ConvertOptions) ([]runtime.Object, error) {
-	noSupKeys := o.Kubernetes.CheckUnsupportedKey(&komposeObject, unsupportedKey)
+func (o *OpenShift) Transform(komposeObject *kobject.KomposeObject, opt kobject.ConvertOptions) ([]runtime.Object, error) {
+	noSupKeys := o.Kubernetes.CheckUnsupportedKey(komposeObject, unsupportedKey)
 	for _, keyName := range noSupKeys {
 		log.Warningf("OpenShift provider doesn't support %s key - ignoring", keyName)
 	}
@@ -350,7 +350,7 @@ func (o *OpenShift) Transform(komposeObject kobject.KomposeObject, opt kobject.C
 	buildRepo := opt.BuildRepo
 	buildBranch := opt.BuildBranch
 
-	sortedKeys := kubernetes.SortedKeys(komposeObject)
+	sortedKeys := kubernetes.SortedKeys(*komposeObject)
 	for _, name := range sortedKeys {
 		service := komposeObject.ServiceConfigs[name]
 		var objects []runtime.Object
@@ -420,7 +420,7 @@ func (o *OpenShift) Transform(komposeObject kobject.KomposeObject, opt kobject.C
 				objects = append(objects, svc)
 			}
 		}
-		o.UpdateKubernetesObjects(name, service, &objects)
+		o.UpdateKubernetesObjects(komposeObject, name, service, &objects)
 
 		allobjects = append(allobjects, objects...)
 	}
@@ -429,7 +429,7 @@ func (o *OpenShift) Transform(komposeObject kobject.KomposeObject, opt kobject.C
 		log.Infof("Buildconfig using %s::%s as source.", buildRepo, buildBranch)
 	}
 	// If docker-compose has a volumes_from directive it will be handled here
-	o.VolumesFrom(&allobjects, komposeObject)
+	o.VolumesFrom(&allobjects, *komposeObject)
 	// sort all object so Services are first
 	o.SortServicesFirst(&allobjects)
 	return allobjects, nil
@@ -449,7 +449,7 @@ func (o *OpenShift) getOpenShiftClient() (*oclient.Client, error) {
 }
 
 // Deploy transofrms and deploys kobject to OpenShift
-func (o *OpenShift) Deploy(komposeObject kobject.KomposeObject, opt kobject.ConvertOptions) error {
+func (o *OpenShift) Deploy(komposeObject *kobject.KomposeObject, opt kobject.ConvertOptions) error {
 	//Convert komposeObject
 	objects, err := o.Transform(komposeObject, opt)
 
@@ -537,7 +537,7 @@ func (o *OpenShift) Deploy(komposeObject kobject.KomposeObject, opt kobject.Conv
 }
 
 //Undeploy removes deployed artifacts from OpenShift cluster
-func (o *OpenShift) Undeploy(komposeObject kobject.KomposeObject, opt kobject.ConvertOptions) []error {
+func (o *OpenShift) Undeploy(komposeObject *kobject.KomposeObject, opt kobject.ConvertOptions) []error {
 	var errorList []error
 	//Convert komposeObject
 	objects, err := o.Transform(komposeObject, opt)

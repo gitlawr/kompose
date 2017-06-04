@@ -563,17 +563,18 @@ func (k *Kubernetes) InitPod(name string, service kobject.ServiceConfig) *api.Po
 
 // Transform maps komposeObject to k8s objects
 // returns object that are already sorted in the way that Services are first
-func (k *Kubernetes) Transform(komposeObject kobject.KomposeObject, opt kobject.ConvertOptions) ([]runtime.Object, error) {
+func (k *Kubernetes) Transform(komposeObject *kobject.KomposeObject, opt kobject.ConvertOptions) ([]runtime.Object, error) {
 
-	noSupKeys := k.CheckUnsupportedKey(&komposeObject, unsupportedKey)
+	noSupKeys := k.CheckUnsupportedKey(komposeObject, unsupportedKey)
 	for _, keyName := range noSupKeys {
 		log.Warningf("Kubernetes provider doesn't support %s key - ignoring", keyName)
+		komposeObject.TransformMessages.WriteString(fmt.Sprintf("WARNING: Kubernetes provider doesn't support %s key - ignoring.\n", keyName))
 	}
 
 	// this will hold all the converted data
 	var allobjects []runtime.Object
 
-	sortedKeys := SortedKeys(komposeObject)
+	sortedKeys := SortedKeys(*komposeObject)
 	for _, name := range sortedKeys {
 		service := komposeObject.ServiceConfigs[name]
 		var objects []runtime.Object
@@ -602,12 +603,12 @@ func (k *Kubernetes) Transform(komposeObject kobject.KomposeObject, opt kobject.
 			}
 		}
 
-		k.UpdateKubernetesObjects(name, service, &objects)
+		k.UpdateKubernetesObjects(komposeObject, name, service, &objects)
 
 		allobjects = append(allobjects, objects...)
 	}
 	// If docker-compose has a volumes_from directive it will be handled here
-	k.VolumesFrom(&allobjects, komposeObject)
+	k.VolumesFrom(&allobjects, *komposeObject)
 	// sort all object so Services are first
 	k.SortServicesFirst(&allobjects)
 	return allobjects, nil
@@ -679,10 +680,10 @@ func (k *Kubernetes) GetKubernetesClient() (*client.Client, string, error) {
 }
 
 // Deploy submits deployment and svc to k8s endpoint
-func (k *Kubernetes) Deploy(komposeObject kobject.KomposeObject, opt kobject.ConvertOptions) error {
+func (k *Kubernetes) Deploy(komposeObject *kobject.KomposeObject, opt kobject.ConvertOptions) error {
 	//Convert komposeObject
 	objects, err := k.Transform(komposeObject, opt)
-
+	log.Info("starttttt deploy:)\n")
 	if err != nil {
 		return errors.Wrap(err, "k.Transform failed")
 	}
@@ -693,6 +694,9 @@ func (k *Kubernetes) Deploy(komposeObject kobject.KomposeObject, opt kobject.Con
 	}
 	log.Info("We are going to create Kubernetes Deployments, Services" + pvcStr + "for your Dockerized application. " +
 		"If you need different kind of resources, use the 'kompose convert' and 'kubectl create -f' commands instead. \n")
+	komposeObject.TransformMessages.WriteString("INFO: We are going to create Kubernetes Deployments, Services" +
+		pvcStr + "for your Dockerized application. If you need different kind of resources, use the 'convert' and " +
+		"'kubectl create -f' commands instead. \n")
 
 	client, ns, err := k.GetKubernetesClient()
 	namespace := ns
@@ -704,6 +708,7 @@ func (k *Kubernetes) Deploy(komposeObject kobject.KomposeObject, opt kobject.Con
 	}
 
 	log.Infof("Deploying application in %q namespace", namespace)
+	komposeObject.TransformMessages.WriteString(fmt.Sprintf("INFO: Deploying application in %q namespace\n", namespace))
 
 	for _, v := range objects {
 		switch t := v.(type) {
@@ -713,30 +718,35 @@ func (k *Kubernetes) Deploy(komposeObject kobject.KomposeObject, opt kobject.Con
 				return err
 			}
 			log.Infof("Successfully created Deployment: %s", t.Name)
+			komposeObject.TransformMessages.WriteString(fmt.Sprintf("INFO: Successfully created Deployment: %s\n", t.Name))
 		case *api.Service:
 			_, err := client.Services(namespace).Create(t)
 			if err != nil {
 				return err
 			}
 			log.Infof("Successfully created Service: %s", t.Name)
+			komposeObject.TransformMessages.WriteString(fmt.Sprintf("INFO: Successfully created Service: %s\n", t.Name))
 		case *api.PersistentVolumeClaim:
 			_, err := client.PersistentVolumeClaims(namespace).Create(t)
 			if err != nil {
 				return err
 			}
 			log.Infof("Successfully created PersistentVolumeClaim: %s of size %s. If your cluster has dynamic storage provisioning, you don't have to do anything. Otherwise you have to create PersistentVolume to make PVC work", t.Name, PVCRequestSize)
+			komposeObject.TransformMessages.WriteString(fmt.Sprintf("INFO: Successfully created PersistentVolumeClaim: %s of size %s. If your cluster has dynamic storage provisioning, you don't have to do anything. Otherwise you have to create PersistentVolume to make PVC work\n", t.Name, PVCRequestSize))
 		case *extensions.Ingress:
 			_, err := client.Ingress(namespace).Create(t)
 			if err != nil {
 				return err
 			}
 			log.Infof("Successfully created Ingress: %s", t.Name)
+			komposeObject.TransformMessages.WriteString(fmt.Sprintf("INFO: Successfully created Ingress: %s\n", t.Name))
 		case *api.Pod:
 			_, err := client.Pods(namespace).Create(t)
 			if err != nil {
 				return err
 			}
 			log.Infof("Successfully created Pod: %s", t.Name)
+			komposeObject.TransformMessages.WriteString(fmt.Sprintf("INFO: Successfully created Pod: %s\n", t.Name))
 		}
 	}
 
@@ -746,12 +756,13 @@ func (k *Kubernetes) Deploy(komposeObject kobject.KomposeObject, opt kobject.Con
 		pvcStr = ""
 	}
 	fmt.Println("\nYour application has been deployed to Kubernetes. You can run 'kubectl get deployment,svc,pods" + pvcStr + "' for details.")
+	komposeObject.TransformMessages.WriteString("\nYour application has been deployed to Kubernetes. You can run 'kubectl get deployment,svc,pods" + pvcStr + "' for details.\n")
 
 	return nil
 }
 
 // Undeploy deletes deployed objects from Kubernetes cluster
-func (k *Kubernetes) Undeploy(komposeObject kobject.KomposeObject, opt kobject.ConvertOptions) []error {
+func (k *Kubernetes) Undeploy(komposeObject *kobject.KomposeObject, opt kobject.ConvertOptions) []error {
 	var errorList []error
 	//Convert komposeObject
 	objects, err := k.Transform(komposeObject, opt)
@@ -772,7 +783,7 @@ func (k *Kubernetes) Undeploy(komposeObject kobject.KomposeObject, opt kobject.C
 	}
 
 	log.Infof("Deleting application in %q namespace", namespace)
-
+	komposeObject.TransformMessages.WriteString(fmt.Sprintf("INFO: Deleting application in %q namespace\n", namespace))
 	for _, v := range objects {
 		label := labels.SelectorFromSet(labels.Set(map[string]string{transformer.Selector: v.(meta.Object).GetName()}))
 		options := api.ListOptions{LabelSelector: label}
@@ -799,7 +810,7 @@ func (k *Kubernetes) Undeploy(komposeObject kobject.KomposeObject, opt kobject.C
 						break
 					}
 					log.Infof("Successfully deleted Deployment: %s", t.Name)
-
+					komposeObject.TransformMessages.WriteString(fmt.Sprintf("INFO: Successfully deleted Deployment: %s\n", t.Name))
 				}
 			}
 
@@ -824,6 +835,7 @@ func (k *Kubernetes) Undeploy(komposeObject kobject.KomposeObject, opt kobject.C
 						break
 					}
 					log.Infof("Successfully deleted Service: %s", t.Name)
+					komposeObject.TransformMessages.WriteString(fmt.Sprintf("INFO: Successfully deleted Service: %s\n", t.Name))
 
 				}
 			}
@@ -843,6 +855,7 @@ func (k *Kubernetes) Undeploy(komposeObject kobject.KomposeObject, opt kobject.C
 						break
 					}
 					log.Infof("Successfully deleted PersistentVolumeClaim: %s", t.Name)
+					komposeObject.TransformMessages.WriteString(fmt.Sprintf("INFO: Successfully deleted PersistentVolumeClaim: %s\n", t.Name))
 				}
 			}
 
@@ -868,6 +881,7 @@ func (k *Kubernetes) Undeploy(komposeObject kobject.KomposeObject, opt kobject.C
 						break
 					}
 					log.Infof("Successfully deleted Ingress: %s", t.Name)
+					komposeObject.TransformMessages.WriteString(fmt.Sprintf("INFO: Successfully deleted Ingress: %s\n", t.Name))
 				}
 			}
 
@@ -891,6 +905,7 @@ func (k *Kubernetes) Undeploy(komposeObject kobject.KomposeObject, opt kobject.C
 						break
 					}
 					log.Infof("Successfully deleted Pod: %s", t.Name)
+					komposeObject.TransformMessages.WriteString(fmt.Sprintf("INFO: Successfully deleted Pod: %s\n", t.Name))
 				}
 			}
 		}

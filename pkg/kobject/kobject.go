@@ -17,6 +17,8 @@ limitations under the License.
 package kobject
 
 import (
+	"bytes"
+
 	"github.com/docker/libcompose/yaml"
 	"k8s.io/kubernetes/pkg/api"
 )
@@ -28,6 +30,9 @@ type KomposeObject struct {
 	// Transformer need to know origin format in order to tell user what tag is not supported in origin format
 	// as they can have different names. For example environment variables  are called environment in compose but Env in bundle.
 	LoadedFrom string
+
+	//storing WARNING/INFO messages during transformation
+	TransformMessages bytes.Buffer
 }
 
 // ConvertOptions holds all options that controls transformation process

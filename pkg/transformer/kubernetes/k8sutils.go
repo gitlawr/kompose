@@ -329,7 +329,7 @@ func (k *Kubernetes) CreateHeadlessService(name string, service kobject.ServiceC
 }
 
 // UpdateKubernetesObjects loads configurations to k8s objects
-func (k *Kubernetes) UpdateKubernetesObjects(name string, service kobject.ServiceConfig, objects *[]runtime.Object) error {
+func (k *Kubernetes) UpdateKubernetesObjects(komposeObject *kobject.KomposeObject, name string, service kobject.ServiceConfig, objects *[]runtime.Object) error {
 	// Configure the environment variables.
 	envs := k.ConfigEnvs(name, service)
 
@@ -387,6 +387,7 @@ func (k *Kubernetes) UpdateKubernetesObjects(name string, service kobject.Servic
 			template.Spec.TerminationGracePeriodSeconds, err = DurationStrToSecondsInt(service.StopGracePeriod)
 			if err != nil {
 				log.Warningf("Failed to parse duration \"%v\" for service \"%v\"", service.StopGracePeriod, name)
+				komposeObject.TransformMessages.WriteString(fmt.Sprintf("WARNING: Failed to parse duration \"%v\" for service \"%v\".\n", service.StopGracePeriod, name))
 			}
 		}
 
@@ -400,6 +401,7 @@ func (k *Kubernetes) UpdateKubernetesObjects(name string, service kobject.Servic
 				podSecurityContext.HostPID = true
 			} else {
 				log.Warningf("Ignoring PID key for service \"%v\". Invalid value \"%v\".", name, service.Pid)
+				komposeObject.TransformMessages.WriteString(fmt.Sprintf("WARNING: Ignoring PID key for service \"%v\". Invalid value \"%v\".\n", name, service.Pid))
 			}
 		}
 
@@ -407,6 +409,7 @@ func (k *Kubernetes) UpdateKubernetesObjects(name string, service kobject.Servic
 			podSecurityContext.SupplementalGroups, err = GetSupplementalGroup(service.GroupAdd)
 			if err != nil {
 				log.Warningf("Failed to convert \"group_add\" to \"SupplementalGroups\" for service \"%v\", you may need to change group name to GId because Kubernetes supplementalGroups supports only GIds.", name)
+				komposeObject.TransformMessages.WriteString(fmt.Sprintf("WARNING: Failed to convert \"group_add\" to \"SupplementalGroups\" for service \"%v\", you may need to change group name to GId because Kubernetes supplementalGroups     supports only GIds.\n", name))
 			}
 		}
 
@@ -419,6 +422,7 @@ func (k *Kubernetes) UpdateKubernetesObjects(name string, service kobject.Servic
 			uid, err := strconv.ParseInt(service.User, 10, 64)
 			if err != nil {
 				log.Warn("Ignoring user directive. User to be specified as a UID (numeric).")
+				komposeObject.TransformMessages.WriteString(fmt.Sprint("WARNING: Ignoring user directive. User to be specified as a UID (numeric).\n"))
 			} else {
 				securityContext.RunAsUser = &uid
 			}

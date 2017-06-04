@@ -309,6 +309,7 @@ func (c *Compose) LoadFile(files []string) (kobject.KomposeObject, error) {
 	noSupKeys := checkUnsupportedKey(composeObject)
 	for _, keyName := range noSupKeys {
 		log.Warningf("Unsupported %s key - ignoring", keyName)
+		komposeObject.TransformMessages.WriteString(fmt.Sprintf("Unsupported %s key - ignoring.\n", keyName))
 	}
 
 	for name, composeServiceConfig := range composeObject.ServiceConfigs.All() {
@@ -319,6 +320,7 @@ func (c *Compose) LoadFile(files []string) (kobject.KomposeObject, error) {
 		serviceConfig.ContainerName = newName
 		if newName != composeServiceConfig.ContainerName {
 			log.Infof("Container name in service %q has been changed from %q to %q", name, composeServiceConfig.ContainerName, newName)
+			komposeObject.TransformMessages.WriteString(fmt.Sprintf("Container name in service %q has been changed from %q to %q.\n", name, composeServiceConfig.ContainerName, newName))
 		}
 		serviceConfig.Command = composeServiceConfig.Entrypoint
 		serviceConfig.Args = composeServiceConfig.Command
@@ -382,6 +384,7 @@ func (c *Compose) LoadFile(files []string) (kobject.KomposeObject, error) {
 		komposeObject.ServiceConfigs[normalizeServiceNames(name)] = serviceConfig
 		if normalizeServiceNames(name) != name {
 			log.Infof("Service name in docker-compose has been changed from %q to %q", name, normalizeServiceNames(name))
+			komposeObject.TransformMessages.WriteString(fmt.Sprintf("Service name in docker-compose has been changed from %q to %q.\n", name, normalizeServiceNames(name)))
 		}
 	}
 
