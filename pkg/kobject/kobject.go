@@ -52,6 +52,7 @@ type ConvertOptions struct {
 	Replicas                    int
 	InputFiles                  []string
 	OutFile                     string
+	ConfigFile                  string
 	Provider                    string
 	Namespace                   string
 	IsDeploymentFlag            bool

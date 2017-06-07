@@ -39,8 +39,8 @@ import (
 	"k8s.io/kubernetes/pkg/apis/extensions"
 
 	client "k8s.io/kubernetes/pkg/client/unversioned"
+	"k8s.io/kubernetes/pkg/client/unversioned/clientcmd"
 	"k8s.io/kubernetes/pkg/kubectl"
-	cmdutil "k8s.io/kubernetes/pkg/kubectl/cmd/util"
 
 	"k8s.io/kubernetes/pkg/runtime"
 	"k8s.io/kubernetes/pkg/util/intstr"
@@ -662,17 +662,23 @@ func (k *Kubernetes) UpdateController(obj runtime.Object, updateTemplate func(*a
 }
 
 // GetKubernetesClient creates the k8s Client, returns k8s client and namespace
-func (k *Kubernetes) GetKubernetesClient() (*client.Client, string, error) {
+func (k *Kubernetes) GetKubernetesClient(configFile string) (*client.Client, string, error) {
 	// initialize Kubernetes client
-	factory := cmdutil.NewFactory(nil)
-	clientConfig, err := factory.ClientConfig()
+	loadingRules := clientcmd.NewDefaultClientConfigLoadingRules()
+	if configFile != "" {
+		loadingRules.ExplicitPath = configFile
+	}
+	configOverrides := &clientcmd.ConfigOverrides{}
+	kubeConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(loadingRules, configOverrides)
+	clientConfig, err := kubeConfig.ClientConfig()
+
 	if err != nil {
 		return nil, "", err
 	}
 	client := client.NewOrDie(clientConfig)
 
 	// get namespace from config
-	namespace, _, err := factory.DefaultNamespace()
+	namespace, _, err := kubeConfig.Namespace()
 	if err != nil {
 		return nil, "", err
 	}
@@ -698,7 +704,7 @@ func (k *Kubernetes) Deploy(komposeObject *kobject.KomposeObject, opt kobject.Co
 		pvcStr + "for your Dockerized application. If you need different kind of resources, use the 'convert' and " +
 		"'kubectl create -f' commands instead. \n")
 
-	client, ns, err := k.GetKubernetesClient()
+	client, ns, err := k.GetKubernetesClient(opt.ConfigFile)
 	namespace := ns
 	if opt.IsNamespaceFlag {
 		namespace = opt.Namespace
@@ -771,7 +777,7 @@ func (k *Kubernetes) Undeploy(komposeObject *kobject.KomposeObject, opt kobject.
 		return errorList
 	}
 
-	client, ns, err := k.GetKubernetesClient()
+	client, ns, err := k.GetKubernetesClient(opt.ConfigFile)
 	namespace := ns
 	if opt.IsNamespaceFlag {
 		namespace = opt.Namespace

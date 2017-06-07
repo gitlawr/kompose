@@ -468,7 +468,7 @@ func (o *OpenShift) Deploy(komposeObject *kobject.KomposeObject, opt kobject.Con
 	if err != nil {
 		return err
 	}
-	kclient, ns, err := o.GetKubernetesClient()
+	kclient, ns, err := o.GetKubernetesClient(opt.ConfigFile)
 	if err != nil {
 		return err
 	}
@@ -551,7 +551,7 @@ func (o *OpenShift) Undeploy(komposeObject *kobject.KomposeObject, opt kobject.C
 		errorList = append(errorList, err)
 		return errorList
 	}
-	kclient, ns, err := o.GetKubernetesClient()
+	kclient, ns, err := o.GetKubernetesClient(opt.ConfigFile)
 	if err != nil {
 		errorList = append(errorList, err)
 		return errorList
